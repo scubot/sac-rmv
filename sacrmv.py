@@ -1,56 +1,22 @@
 import discord
-import shlex
-from modules.botModule import BotModule
+from discord.ext import commands
 
 
-class SACRMV(BotModule):
-    name = 'sacrmv'
+class SACRMV(commands.Cog):
+    def __init__(self, bot):
+        self.version = "2.0.0"
+        self.bot = bot
 
-    description = 'Calculation of SAC and RMV given dive times.'
+    @commands.command()
+    async def air(self, ctx, start_pressure: int, end_pressure: int, bottom_time: int, average_depth: int, tank_sp: int,
+                  tank_capacity: int):
+        pressure = (average_depth * 0.099376) + 1
+        bars_consumed = end_pressure - start_pressure
 
-    help_text = 'Calculates SAC (Surface Air Consumption) and RMV (Respiratory Mean Volume) given dive times. \n' \
-                '`!air [start_pressure BAR] [end_pressure BAR] [bottom_time MINUTE] [average_depth METRE] ' \
-                '[tank_service_pressure BAR] [tank_capacity LITRE]`'
+        sac = bars_consumed / bottom_time / pressure
+        rmv = (tank_capacity / tank_sp) * sac
 
-    trigger_string = 'air'
-
-    module_version = '1.0.0'
-
-    @staticmethod
-    def is_number(li):
-        for i in li:
-            try:
-                int(i)
-            except ValueError:
-                return False
-        return True
-
-    async def parse_command(self, message, client):
-        msg = shlex.split(message.content)
-        if len(msg) != 7:
-            send_message = "[!] Missing arguments."
-            await client.send_message(message.channel, send_message)
-            return 0
-        if not self.is_number(msg[1:]):
-            send_message = "[!] Invalid arguments."
-            await client.send_message(message.channel, send_message)
-            return 0
-        start_bar = int(msg[1])
-        end_bar = int(msg[2])
-        bar = start_bar-end_bar
-        bottom_time = int(msg[3])
-
-        msw = int(msg[4])
-
-        pressure = (msw*0.099376) + 1
-
-        sac = bar/bottom_time/pressure
-
-        service_pressure = int(msg[5])
-        tank_capacity = int(msg[6])
-        rmv = (tank_capacity/service_pressure)*sac
-
-        send_message = "SAC: " + str(sac) + " bar/min" + "\n" \
-                       "RMV: " + str(rmv) + " litres/min"
-
-        await client.send_message(message.channel, send_message)
+        embed = discord.Embed(title="SAC/RMV Calculation")
+        embed.add_field(name="Surface Air Consumption", value="{:0.2f}".format(sac))
+        embed.add_field(name="Respiratory Mean Volume", value="{:0.2f}".format(rmv))
+        await ctx.send(embed=embed)
